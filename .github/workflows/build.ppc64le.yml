@@ -1,0 +1,139 @@
+name: Release linux/ppc64le
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-ppc64le-bazel:
+    name: Bazel ppc64le on Linux
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 0
+      - name: Bazel on Linux
+        run: |
+          set -x -e
+          bash -e .github/workflows/build.bazel.sh python3
+      - uses: actions/upload-artifact@v4.3.3
+        with:
+          name: ${{ runner.os }}-ppc64le-bazel-bin
+          path: |
+            build/tensorflow_io
+            build/tensorflow_io_gcs_filesystem
+      - run: |
+          set -x -e
+          echo "Successfully completed Linux ppc64le release"
+         
+  linux-ppc64le-wheel:
+    name: Wheel ${{ matrix.python }} Linux ppc64le
+    needs: linux-ppc64le-bazel
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python: ['3.9', '3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4.1.7
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: ${{ runner.os }}-ppc64le-bazel-bin
+          path: bazel-bin
+      - name: Wheel ${{ matrix.python }} Linux
+        run: |
+          set -x -e
+          sudo apt-get update
+          sudo apt-get install -y python${{ matrix.python }} python${{ matrix.python }}-dev python${{ matrix.python }}-distutils
+          python${{ matrix.python }} --version
+          python${{ matrix.python }} -m ensurepip
+          python${{ matrix.python }} -m pip install --upgrade pip
+          python${{ matrix.python }} -m pip install wheel setuptools
+          python${{ matrix.python }} setup.py --data bazel-bin -q bdist_wheel --plat-name manylinux2014_ppc64le
+          rm -rf build
+          python${{ matrix.python }} setup.py --project tensorflow-io-gcs-filesystem --data bazel-bin -q bdist_wheel --plat-name manylinux2014_ppc64le
+          ls dist/*
+          mkdir -p wheelhouse
+          for f in dist/*.whl; do
+            cp $f wheelhouse
+          done
+          ls wheelhouse/*
+      - uses: actions/upload-artifact@v4.3.3
+        with:
+          name: ${{ runner.os }}-ppc64le-${{ matrix.python }}-wheel
+          path: wheelhouse
+
+  release-linux-ppc64le:
+    name: Release (Linux ppc64le)
+    needs: linux-ppc64le-wheel
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux-ppc64le-3.9-wheel
+          path: linux-ppc64le-3.9-wheel
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux-ppc64le-3.10-wheel
+          path: linux-ppc64le-3.10-wheel
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux-ppc64le-3.11-wheel
+          path: linux-ppc64le-3.11-wheel
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: linux-ppc64le-3.12-wheel
+          path: linux-ppc64le-3.12-wheel
+      - run: |
+          set -e -x
+          mkdir -p wheelhouse
+          cp linux-ppc64le-3.9-wheel/*.whl wheelhouse/
+          cp linux-ppc64le-3.10-wheel/*.whl wheelhouse/
+          cp linux-ppc64le-3.11-wheel/*.whl wheelhouse/
+          cp linux-ppc64le-3.12-wheel/*.whl wheelhouse/
+          ls -la wheelhouse/
+          sha256sum wheelhouse/*.whl
+      - uses: actions/upload-artifact@v4.3.3
+        with:
+          name: tensorflow-io-release-linux-ppc64le
+          path: wheelhouse
+
+  release-candidate-linux-ppc64le:
+    name: Release Candidate (Linux ppc64le)
+    needs: release-linux-ppc64le
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4.1.7
+      - uses: actions/download-artifact@v4.1.7
+        with:
+          name: tensorflow-io-release-linux-ppc64le
+          path: wheelhouse
+      - run: |
+          set -x -e
+          sha256sum wheelhouse/*.whl | sort -u > wheelhouse.sha256
+          git rev-parse --verify HEAD > wheelhouse.commit
+          grep 'version = ' tensorflow_io/python/ops/version_ops.py  | sed -E 's@^.*version = "@@g' | sed -E 's@".*$@@g' > wheelhouse.version
+          cat wheelhouse.sha256
+          cat wheelhouse.commit
+          cat wheelhouse.version
+          echo "::set-output name=version::$(cat wheelhouse.version)"
+        id: info
+      - run: |-
+          cat <<EOF > Dockerfile
+          FROM gcr.io/distroless/base-debian11
+          COPY wheelhouse /wheelhouse
+          COPY wheelhouse.sha256 /wheelhouse.sha256
+          COPY wheelhouse.commit /wheelhouse.commit
+          COPY wheelhouse.version /wheelhouse.version
+          EOF
+      - uses: docker/setup-buildx-action@v3.3.0
+      - uses: docker/login-action@v3.2.0
+        with:
+          username: tfsigio
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - uses: docker/build-push-action@v6.2.0
+        with:
+          context: .
+          push: true
+          tags: tfsigio/candidate:linux-ppc64le-${{ steps.info.outputs.version }}
