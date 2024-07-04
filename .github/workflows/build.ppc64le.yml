@@ -1,7 +1,12 @@
 name: Release linux/ppc64le
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
 
 permissions:
   contents: read
