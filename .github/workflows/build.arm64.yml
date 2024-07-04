@@ -3,8 +3,8 @@ name: Release arm64 on macOS
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
+# permissions:
+#   contents: read
 
 jobs:
   macos-arm64-bazel:
