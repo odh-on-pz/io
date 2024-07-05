@@ -26,19 +26,19 @@ $PYTHON --version
 export PYTHON_BIN_PATH=`which $PYTHON`
 
 if [[ $(uname) == "Linux" ]]; then
-  if [[ $(uname -m) == "ppc64le" ]]; then
-    yum install java-11-openjdk-devel
-    wget https://github.com/bazelbuild/bazel/releases/download/5.4.1/bazel-5.4.1-dist.zip
-    unzip bazel-5.4.1-dist.zip -d bazelzip
-    cd bazelzip
-    export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.22.0.7-2.el9.ppc64le
-    export PATH=$JAVA_HOME/bin:$PATH
-    bash compile.sh
-    export PATH=$PATH:output
-  else
-  curl -sSOL https://github.com/bazelbuild/bazelisk/releases/download/v1.11.0/bazelisk-linux-amd64
-  mv bazelisk-linux-amd64 /usr/local/bin/bazel
-  chmod +x /usr/local/bin/bazel
+  # if [[ $(uname -m) == "ppc64le" ]]; then
+  yum install java-11-openjdk-devel
+  wget https://github.com/bazelbuild/bazel/releases/download/5.4.1/bazel-5.4.1-dist.zip
+  unzip bazel-5.4.1-dist.zip -d bazelzip
+  cd bazelzip
+  export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.22.0.7-2.el9.ppc64le
+  export PATH=$JAVA_HOME/bin:$PATH
+  bash compile.sh
+  export PATH=$PATH:output
+  #else
+  # curl -sSOL https://github.com/bazelbuild/bazelisk/releases/download/v1.11.0/bazelisk-linux-amd64
+  # mv bazelisk-linux-amd64 /usr/local/bin/bazel
+  # chmod +x /usr/local/bin/bazel
   cp -f $(which $PYTHON) /usr/bin/python3
   fi
 fi
