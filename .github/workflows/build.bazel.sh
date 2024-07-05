@@ -26,7 +26,7 @@ $PYTHON --version
 export PYTHON_BIN_PATH=`which $PYTHON`
 
 if [[ $(uname) == "Linux" ]]; then
-  if [[ "$(uname -m)" == "ppc64le" ]]; then
+  if [[ $(uname -m) == "ppc64le" ]]; then
     yum install java-11-openjdk-devel
     wget https://github.com/bazelbuild/bazel/releases/download/5.4.1/bazel-5.4.1-dist.zip
     unzip bazel-5.4.1-dist.zip -d bazelzip
